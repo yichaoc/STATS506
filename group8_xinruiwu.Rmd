@@ -1,0 +1,115 @@
+---
+title: "Group8 Alcohol Use and Eating Habit"
+author: "Xinrui Wu"
+date: "12/5/2019"
+output:
+  html_document:
+    df_print: paged
+  pdf_document:
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r library, include=FALSE, results='hide'}
+library(Hmisc)
+library(tidyverse)
+```
+
+## Introduction
+Our group mainly focus on the relationship between eating habit and alcohol use of people while some demographic variables are also included. Zero inflation negative binomial regression model is used in our analysis process due to the structure of the response variable.
+
+## Data to Use
+Three datasets from NHANES 2005-2006  are used:\newline
+1.Alcohol Use (ALQ_D.xpt)\newline
+2.Diet Behavior & Nutrition (DBQ_D.xpt)\newline
+3.Demographic Variables & Sample Weights (DEMO_D.xpt)\newline
+
+From these three datasets, we choose the following variable:
+ALQ130 - Avg # alcoholic drinks/day -past 12 mos (1-32:range of values) - "alcohol"\newline
+DBQ700 - How healthy is the diet (1-5:Excellent-poor) - "diet"\newline
+DBD091 - # of times/wk eat meals not from a home (1-21:range of values) - "meal_out" \newline
+RIAGENDR - Gender (1:Male 2:Female) - "gender" \newline
+RIDAGEYR - Age at Screening Adjudicated - Recode (0-84:range of values) - "age" \newline
+INDFMPIR - Family PIR (0-5:a ratio of family income to poverty threshold) - "pir" \newline
+
+Here we only focus on adults and select samples with age>=21.
+
+## Programming Method
+R (using dplyr for basic data cleaning) and SAS
+
+## 1. Data Cleaning
+Read the data the join variables to use in a new dataset.
+```{r data1, include=FALSE}
+# read data :
+alcohol = sasxport.get("ALQ_D.XPT")
+diet = sasxport.get("DBQ_D.XPT")
+demographic = sasxport.get("DEMO_D.XPT")
+
+# select variables and merge : 
+alcohol_need = select(alcohol, id = seqn, alq = alq130)
+diet_need = select(diet, id = seqn, meal_out = dbd091, diet = dbq700)
+demo_need = select(demographic, id = seqn, age = ridageyr, gender = riagendr, pir = indfmpir)
+alq_diet = merge(alcohol_need, diet_need, by = "id")
+alq_diet = merge(alq_diet, demo_need, by = "id")
+```
+
+Since in the raw dataset, people who don't drink report "1" in the variable "ALQ130", transfer 1's in the related variable to 0's.
+Delete all missing values.
+
+```{r data2, include=FALSE}
+alq_diet[which(alq_diet$alq %in% c(777,999)),"alq"] = NA
+alq_diet[which(alq_diet$alq == 1),"alq"] = 0
+alq_diet[which(alq_diet$meal_out == 5555), "meal_out"] = 21
+alq_diet[which(alq_diet$meal_out == 6666), "meal_out"] = 0
+alq_diet[which(alq_diet$meal_out %in% c(7777,9999)),"meal_out"] = NA
+alq_diet[which(alq_diet$gender == 2), "gender"] = 0
+alq_diet = alq_diet%>%
+  filter(age>=21) %>%
+  filter(!is.na(alq) & !is.na(meal_out) & !is.na(pir) & !is.na(diet))
+
+```
+
+Write the new dataset to a csv file for later using in SAS.
+```{r data3, include=FALSE}
+write.csv(alq_diet, file = "alq_diet.csv")
+```
+
+## 2.Check the data
+Read the new dataset into SAS. \newline
+Check the distribution (mean and variance) of the variables. \newline
+```{r check1, echo=FALSE, fig.align='center'}
+knitr::include_graphics("dist_check.pdf")
+```
+
+Draw a histgram to see the distribution of the response variable ("alcohol use"). \newline
+```{r check2, echo=FALSE, fig.align='center'}
+knitr::include_graphics("hist_alq.pdf")
+```
+
+The response variable (alcohol use) is a count variable, so generally we can use Poisson regression. However, the mean and variance of the response shown above as "alq" are not the same, which does not fit the assumption of Poisson regression. So we choose to use negative binomial regression instead.\newline
+From the histgram we see that many people do not drink thus there are many 0's in the response. We can imagine that people's not drinking is influnced by another process compared to how much people drink. Thus we use zero-inflated negative binomial regression so that the 0's can be independently modeled.
+
+## 3.Build Model
+### (1) negative binomial regression
+Firstly, use negative binomial regression to fit model alcohol ~ diet + gender + age + pir . The result is as below.\newline
+```{r nbreg, echo=FALSE, fig.align='center'}
+knitr::include_graphics("nb_results.pdf")
+```
+
+### (2) zero-inflated negative binomial regression
+Then, use zero-inflated negative binomial regression to fit model alcohol ~ diet + gender + age + pir where alcohol is not 0 and fit model alcohol ~ meal_out where alcohol is 0. The result is as below.\newline
+```{r zinbreg, echo=FALSE, fig.align='center'}
+knitr::include_graphics("zinb_results.pdf")
+```
+
+We can see from the results that in both models, all the variables are significant. By the AIC value, we can see that the zero-inflated negative binomial model is better.
+
+## 4.Comparing and Analysis
+In this part, I'll use Vuong test to compare the performance of the two models. And then do some further analysis.\newline
+This part is to be done. \newline
+
+
