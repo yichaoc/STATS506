@@ -1,0 +1,332 @@
+---
+title: 'Group8: Zero-inflated Negative Binomial Regression'
+author: "Amanda Lee Ketner, Yichao Chen, Xirui Wu"
+date: "12/9/2019"
+output:
+  html_document:
+    toc: yes
+  pdf_document:
+    toc: yes
+subtitle: '*Analysis of the relationship between diet habit and alcohol use*'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message = FALSE)
+library(foreign)
+library(data.table)
+library(knitr)
+library(tidyverse)
+library(pscl) # used for zero-inflated negative binomial regression
+library(MASS) # used for negative binomial regression
+library(ggplot2)
+library(magrittr)
+library(kableExtra)
+library(Hmisc)
+```
+
+## Introduction
+Does the habit of diet has some relationship with the alcohol use of people? People with what kind of eating habit tend to drink alcohol more? Our group mainly focus on the relatinship between diet habit and alcohol use. Some demographic variables such as gender, family PIR, age are also taken into consideration in our analysis.
+
+Based on our data, we chose to use zero-inflated negative binomial regression to fit the model. The choice of this regression is further illustrated in the part of method. Our group members use Stata,R and SAS.  
+
+## Data
+### Data resource
+We used three datasets in this analysis:
+
+1.Alcohol Use (ALQ_D.xpt) 
+
+2.Diet Behavior & Nutrition (DBQ_D.xpt) 
+
+3.Demographic Variables & Sample Weights (DEMO_D.xpt) 
+
+They are downloaded from NHANES (National Health and Nutrition Examination Survey) from year 2005 - 2006.
+
+As we are making analysis on the alcohol use, so we will only focus on adults (age $\geqslant$ 21).
+
+### Selected Variables
+```{r,echo=FALSE}
+name=c('alq_frink','diet','meal_out','gender','age','pir')
+ori_name = c("ALQ130", "DBQ700", "DBD091", "RIAGENDR", "RIDAGEYR", "INDFMPIR")
+describe = c("Avg number of alcoholic drinks/day -past 12 mos (1-32:range of values)",
+      "How healthy is the diet (1-5:Excellent-poor)", 
+      "Number of times/wk eat meals not from a home (1-21:range of values)", 
+      "Gender (1:Male 2:Female)",
+      "Age at Screening Adjudicated - Recode (0-84:range of values)",
+      "Family Poverty Income Ratio (0-5:a ratio of family income to poverty threshold)")
+dataxpt=c('ALQ_D','DBQ_D','DBQ_D','DEMO_D','DEMO_D','DEMO_D')
+data.table(Variales = name, Origin_name=ori_name,Description=describe,Dataset=dataxpt)%>%
+  knitr::kable(align = "l") %>% 
+  kable_styling(bootstrap_options = c("striped", "hover"), position = "left")
+
+
+
+```
+
+## Methods
+The zero-inflated negative binomial regression is used for count data that exhibit overdispersion and excess zeros. The data distribution combines the negative binomial distribution and the logit distribution.
+
+Suppose for each observation, there are two possible cases. If case 1 occurs, the count is zero. If case 2 occurs, counts(including zeros) are generated according to the negative binomial model. We focus on our analysis here. Case is that this person never drink because of some reasons such as alcohol allergy. Case 2 is that this person do have the habit of drink alcohol but the counts of drink may differ according to some related factors. Suppose that case 1 occurs with probalility $\pi$ and case 2 occurs with probability $1-\pi$ . Therefore, the probability distribution of zero-inflated negative binomial regression random variable $y_{i}$ could be written:
+
+$$
+\operatorname{Pr}\left(y_{i}=j\right)=\left\{\begin{array}{ll}{\pi_{i}+\left(1-\pi_{i}\right) g\left(y_{i}=0\right)} & {\text { if } j=0} \\ {\left(1-\pi_{i}\right) g\left(y_{i}\right)} & {\text { if } j>0}\end{array}\right.
+$$
+where $\pi_{i}$ is the logistic link function defined below and $g\left(y_{i}\right)$ is the negative binomial distribution given by 
+$$
+g\left(y_{i}\right)=\operatorname{Pr}\left(Y=y_{i} | \mu_{i}, \alpha\right)=\frac{\Gamma\left(y_{i}+\alpha^{-1}\right)}{\Gamma\left(\alpha^{-1}\right) \Gamma\left(y_{i}+1\right)}\left(\frac{1}{1+\alpha \mu_{i}}\right)^{\alpha^{-1}}\left(\frac{\alpha \mu_{i}}{1+\alpha \mu_{i}}\right)^{y_{i}}
+$$
+
+Why we choose this zero-inflated negative binomial regression model to fit our data?
+
+As observed, alq_drink is a count variable, this implys that the choice of possion regression or negative binomial regression may be more suitable. we then do some basic analysis of our response:alq_drink.It is overdispersed as its variance is not basiclly equal to its mean. In this case, negative binomial regression might be a better choice. Also, there are excessive zeros in alq_drink. As a result, zero-inflation should be taken into consideration as well. We will also make comparisions to figure out whether the consideration of zero-inflation could contribute to a better model. Details could be found in the core analysis below.
+
+## Core Analysis {.tabset .tabset-fade}
+
+### R
+#### Data cleaning
+The cleaning process is done using the package of data.table. Three diffrent datasets are merged by the variable of SEQN. Observations with missing values are all dropped.
+```{r}
+library(foreign)
+library(data.table)
+AL=read.xport('Data/ALQ_D.xpt')
+write.csv(AL,file='Data/ALQ_D.csv')
+DBQ=read.xport('Data/DBQ_D.xpt')
+write.csv(DBQ,file='Data/DBQ_D.csv')
+DEMO=read.xport('Data/DEMO_D.xpt')
+write.csv(DEMO,file='Data/DEMO_D.csv')
+ALQ_D= fread('Data/ALQ_D.csv')
+DBQ_D=fread('Data/DBQ_D.csv')
+DEMO_D=fread('Data/DEMO_D.csv')
+# delete missing values of ALQ30 ane rename ALQ30 as alq_drink
+# In the original data <1 drink  are recorded as 1, we replace 1 with 0 here
+A1=ALQ_D[ALQ130!=''&ALQ130!=999,.(SEQN,alq_drink=ALQ130)][alq_drink==1,alq_drink:=0]
+# delete missing values of DBD091 and DBQ700
+# DBD091:5555(representing >21) consider as 21; 6666(representing <1) consider as 0
+# rename DBD091 as meal_out; rename DBQ700 as diet
+DBQ1=DBQ_D[DBD091!=''&DBD091!=7777&DBD091!=9999&DBQ700!=''&DBQ700!=7&DBQ700!=9][
+  DBD091==6666,DBD091:=0][DBD091==5555,DBD091:=21][
+    ,.(SEQN,meal_out=DBD091,diet=DBQ700)]
+# delete missing values of RIAGENDR,RIDAGEYR,INDFMPIR
+# only focus on adults(age>=21)
+# rename RIAGENDR as gender;RIDAGEYR as age; INDFMPIR as pir
+DEMO1=DEMO_D[RIAGENDR!=''&RIDAGEYR!=''&RIDAGEYR>=21&INDFMPIR!=''][
+  RIAGENDR==2,RIAGENDR:=0][,.(SEQN,gender=RIAGENDR,age=RIDAGEYR,pir=INDFMPIR)]
+#join these three datasets together according to SEQN
+data=A1[DBQ1,on='SEQN',nomatch=0L][DEMO1,on='SEQN',nomatch=0L]
+```
+
+#### Basic data analysis
+As discussed above, whether negative binomial regression is more suitable than poisson regression? Should the zero-inflation be considered? To figure this out, the basic analysis should be made on the response: alq_drink.
+
+The mean and variance are calculated:
+```{r}
+#calculate mean and variance
+sprintf("Mean and Variance = %1.2f and %1.2f", 
+        mean(data$alq_drink), var(data$alq_drink))
+```
+
+The plot of alq_drink are shown as below:
+```{r}
+# histogram with alq_drink
+ggplot(data,aes(alq_drink))+geom_histogram()+stat_bin(bins=25)+xlab('alq_drink_counts')+ylab('frequency')+ggtitle('The frequency of alq_drink counts')+theme(plot.title=element_text(hjust=0.5))
+```
+
+From the result, alq_drink is overdispersed as its variance is not basiclly equal to its mean. So, the negative binomial regression is more suitable than poisson regression in our data. From the plot, we could see that a large part of observation has 0 alcohol drink. Taking excess zeros of alq_drink into consideration, zero-inflated regression is used.
+
+#### Zero-Inflated Negative Binomial Regression
+The package of pscl is used for zero-inflated negative binomial regression. The variables of diet, gender, age and pir are used in the part of negative binomial model and the variable of meal_out is used in the logit part of the model.
+```{r}
+m1=zeroinfl(alq_drink~diet+gender+age+pir|meal_out,data=data,dist='negbin',EM=TRUE)
+summary(m1)
+m0=update(m1, . ~ 1)
+pchisq(2 * (logLik(m1) - logLik(m0)), df = 5, lower.tail=FALSE)
+```
+From the output of chi-squared test, we know that our overall model is statistically significant. 
+
+From the result of m1, the variables of diet, gender, age and pir in the part of negative binomial are all significant predictors. The variable of meal_out in the part of the logit model predicting excessive zero is also statistically significant.
+
+The expeceted change in log(alq_drink) for one-unit increase in diet is 0.079589 holding other variable constant. From the codebook, the larger diet factor indicate poorer diet behavior. The model shows that poorer diet may related to more alcohol use.
+
+When gender change from 0 to 1, the change in log(alq_drink) is 0.544, men tends to drink more than women.
+
+The expeceted change in log(alq_drink) for one-unit increase in age is -0.016 holding other variable constant. This means when age increase, people tend to drink alcohol less.
+
+The expeceted change in log(alq_drink) for one-unit increase in age is -0.097 holding other variable constant, which means family with better finacial situation might use alcohol less.
+
+The log odds of being an excessive zero will decrease by 0.05516 for every one more meal eating outside. This means when the frequency of eating out of home is larger, the zero are less likely comes from the part of people who never use alcohol. In other words, more meals eating out of home implies more alcohol use.
+
+#### Negative Binomial Regression
+Has the consideration of zero-inflation improved our regression model? We could fit the data with negative binomial regression and make comparisions with the former model.
+
+The package of MASS is used for building negative bionomial regression model.
+```{r}
+m2=glm.nb(alq_drink~diet+gender+age+pir,data=data)
+summary(m2)
+vuong(m1, m2)
+```
+The summary of m2 shows that the variables of diet, gender, age and pir are all significant. The Vuong test suggests that zero-inflated negative binomial regression have better performance and its improvement is significant.
+
+#### Predict alq_drink and Show results
+Finally, we could compute the predicted number of alcohol use for diffrent combinations of our predictors. The plot of predicted alq_drink counts and variables may help us see the potential relationship more directly.
+```{r}
+newdata1 <- expand.grid(1:5, factor(0:1),21:85,0:5,1:21)
+colnames(newdata1)<-c('diet','gender','age','pir','meal_out')
+newdata1$alqpre<-predict(m1,newdata1)
+ggplot(newdata1, aes(x = diet, y = alqpre, colour = factor(pir))) +
+  geom_point() +
+  facet_wrap(~gender) +
+  labs(x = "diet", y = "Predicted alcohol drink counts")
+```
+
+From the plot, we could see directly that male use alcohol more, poor family pir use alcohol more and unheathier diet use alcohol more. This implies that the use of alchhol may have some correlation with gender, family PIR and diet habit.
+
+### Stata
+#### Cleaning the data
+```{stata, echo=TRUE, comment = NA, eval = FALSE}
+
+cd "/Data/"
+
+*Import data
+import sasxport5 "ALQ_D.xpt", clear
+save "Alcohol.dta", replace
+import sasxport5 "DBQ_D.xpt", clear
+save "Diet.dta", replace
+import sasxport5 "Demo_D.xpt", clear
+save "Demographic.dta", replace
+
+*Clean data and drop unwanted variables
+use "Alcohol.dta", clear
+keep seqn alq130
+replace alq130=. if alq130==999
+replace alq130=0 if alq130==1
+rename alq130 alq_drink
+save "Alcohol.dta", replace
+
+use "Diet.dta", clear
+keep seqn dbd091 dbq700
+replace dbd091=0 if dbd091==6666
+replace dbd091=21 if dbd091==5555
+replace dbd091=. if dbd091==7777 | dbd091==9999
+replace dbq700=. if dbq700==7 | dbq700==9
+rename dbd091 meal_out
+rename dbq700 diet
+save "Diet.dta", replace
+
+use "Demographic.dta", replace
+keep seqn ridageyr riagendr indfmpir
+replace riagendr=0 if riagendr==2
+rename ridageyr age
+rename riagendr gender
+rename indfmpir pir
+save "Demographic.dta", replace
+
+*Merge data together and drop minors
+use "Alcohol.dta", clear
+merge 1:1 seqn using "Diet.dta", nogen
+merge 1:1 seqn using "Demographic.dta", nogen
+drop if Age<21
+save "Final.dta", replace
+
+```
+
+#### Negative binomial model (without zero-inflation)
+
+```{stata, echo=TRUE, comment = NA, eval = FALSE}
+
+nbreg alq_drink diet i.gender age pir
+outreg2 using NegBin.xls, stats(coef se tstat pval) noaster replace
+
+```
+
+
+#### Zero-Inflated Negative binomial model
+
+```{stata, echo=TRUE, comment = NA, eval = FALSE}
+
+zinb alq_drink diet i.gender age pir, inflate(meal_out)
+outreg2 using ZeroNegBin.xls, stats(coef se tstat pval) noaster replace
+
+```
+
+### SAS
+#### Data Cleaning
+Read the data the join variables to use in a new dataset.
+```{r data1,eval=FALSE}
+# read data :
+alcohol = sasxport.get("ALQ_D.XPT")
+diet = sasxport.get("DBQ_D.XPT")
+demographic = sasxport.get("DEMO_D.XPT")
+
+# select variables and merge : 
+alcohol_need = select(alcohol, id = seqn, alq = alq130)
+diet_need = select(diet, id = seqn, meal_out = dbd091, diet = dbq700)
+demo_need = select(demographic, id = seqn, age = ridageyr, gender = riagendr, pir = indfmpir)
+alq_diet = merge(alcohol_need, diet_need, by = "id")
+alq_diet = merge(alq_diet, demo_need, by = "id")
+```
+
+Since in the raw dataset, people who don't drink report "1" in the variable "ALQ130", transfer 1's in the related variable to 0's.
+Delete all missing values.
+
+```{r data2,eval=FALSE}
+alq_diet[which(alq_diet$alq %in% c(777,999)),"alq"] = NA
+alq_diet[which(alq_diet$alq == 1),"alq"] = 0
+alq_diet[which(alq_diet$meal_out == 5555), "meal_out"] = 21
+alq_diet[which(alq_diet$meal_out == 6666), "meal_out"] = 0
+alq_diet[which(alq_diet$meal_out %in% c(7777,9999)),"meal_out"] = NA
+alq_diet[which(alq_diet$gender == 2), "gender"] = 0
+alq_diet = alq_diet%>%
+  filter(age>=21) %>%
+  filter(!is.na(alq) & !is.na(meal_out) & !is.na(pir) & !is.na(diet))
+
+```
+
+Write the new dataset to a csv file for later using in SAS.
+```{r data3,eval=FALSE}
+write.csv(alq_diet, file = "alq_diet.csv")
+```
+
+#### Check the data
+Read the new dataset into SAS. 
+
+Check the distribution (mean and variance) of the variables.
+
+```{r check1, fig.align='center',eval=FALSE}
+knitr::include_graphics("dist_check.pdf")
+```
+
+Draw a histgram to see the distribution of the response variable ("alcohol use"). 
+
+```{r check2,  fig.align='center',eval=FALSE}
+knitr::include_graphics("hist_alq.pdf")
+```
+
+The response variable (alcohol use) is a count variable, so generally we can use Poisson regression. However, the mean and variance of the response shown above as "alq" are not the same, which does not fit the assumption of Poisson regression. So we choose to use negative binomial regression instead.
+
+From the histgram we see that many people do not drink thus there are many 0's in the response. We can imagine that people's not drinking is influnced by another process compared to how much people drink. Thus we use zero-inflated negative binomial regression so that the 0's can be independently modeled.
+
+#### 3.Build Model
+##### negative binomial regression
+Firstly, use negative binomial regression to fit model alcohol ~ diet + gender + age + pir . The result is as below.\newline
+```{r nbreg, echo=FALSE, fig.align='center',eval=FALSE}
+knitr::include_graphics("nb_results.pdf")
+```
+
+#### zero-inflated negative binomial regression
+Then, use zero-inflated negative binomial regression to fit model alcohol ~ diet + gender + age + pir where alcohol is not 0 and fit model alcohol ~ meal_out where alcohol is 0. The result is as below.\newline
+```{r zinbreg, echo=FALSE, fig.align='center',eval=FALSE}
+#knitr::include_graphics("zinb_results.pdf")
+```
+
+We can see from the results that in both models, all the variables are significant. By the AIC value, we can see that the zero-inflated negative binomial model is better.
+
+#### Comparing and Analysis
+In this part, I'll use Vuong test to compare the performance of the two models. And then do some further analysis.\newline
+This part is to be done. \newline
+
+## Results
+
+## Discussion
+
+## References
+
+https://ncss-wpengine.netdna-ssl.com/wp-content/themes/ncss/pdf/Procedures/NCSS/Zero-Inflated_Negative_Binomial_Regression.pdf
