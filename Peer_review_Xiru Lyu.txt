@@ -1,0 +1,25 @@
+Peer Review for Group Project
+Script by Yichao Chen
+Reviewed by Xiru Lyu, xlyu@umich.edu
+
+1. Core and additional analyses
+
+Your codes work as advertised and are very efficient! You also have comments throughout the script, making it very easy to follow. I notice that your script doesn't have a consistent style. For example, you use "<-" and "=" interchangably when assigning the object. You should also consider to add spaces between characters because in some lines codes just get squeezed together.
+
+2. Common sections
+
+First of all, the current version of the draft needs methods, additional analysis and results sections.
+
+For the data section, I think it would more helpful to outline specifically on why you choose these variables and how you manipulate them to fit the model. How many observations are available for analysis after the data cleaning process? Can you explain why you only focus on adults older than 21? Is it due to the limitation of the dataset or any other reason?
+
+Also, in the methods section, it would be more helpful to elaborate on the zero inflation negative binomial regression model that you want to fit. Why this choice? Can you write a formula for the fitted model? You may also consider to talk about packages that you use in the next section.
+
+3. Git utilization
+
+You have a very clear ReadMe section showing the objective of the project and each group member's contribution. All group members have at least two commits. Nice work!
+
+4. Quality of presentation
+
+For both plots that you include in the report, you may want to consider changing labels for the first one and add titles/descriptions for both. Also, it would be better if you can set the number of decimal places when displaying results of the fitted model. If time permits, I would recommend inserting output tables rather than plain outputs from the console. Another thing that I want to comment on is that the typesetting is a bit off when you displaying a graph and having a paragraph afterwards. The graph isn't centered and the beginning of the sentence is followed immediately after the graph.
+
+Good job overall! 
