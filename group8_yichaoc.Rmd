@@ -106,7 +106,7 @@ From the result of Vuong test, we could know that zero-inflated negative binomia
 
 Finally, we can compute the predicted number of alcohol use for diffrent combinations of our predictors
 ```{r}
-newdata1 <- expand.grid(1:5, factor(0:1),21:85,0:5,1:21)
+newdata1 = expand.grid(1:5, factor(0:1),21:85,0:5,1:21)
 colnames(newdata1)<-c('diet','gender','age','pir','meal_out')
 newdata1$alqpre<-predict(m1,newdata1)
 ggplot(newdata1, aes(x = diet, y = alqpre, colour = factor(pir))) +
