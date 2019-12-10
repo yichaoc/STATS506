@@ -3,10 +3,10 @@ title: "Group8 Alcohol Use and Eating Habit"
 author: "Xinrui Wu"
 date: "12/5/2019"
 output:
-  pdf_document:
-    latex_engine: xelatex
   html_document:
     df_print: paged
+  pdf_document:
+    latex_engine: xelatex
 ---
 
 ```{r setup, include=FALSE}
@@ -122,14 +122,19 @@ The response variable (alcohol use) is a count variable, so generally we can use
 From the histgram we see that many people do not drink thus there are many 0's in the response. We can imagine that people's not drinking is influnced by another process compared to how much people drink. Thus we use zero-inflated negative binomial regression so that the 0's can be independently modeled.
 
 ## 3.Build Model
-The following process is done using SAS.
-##### negative binomial regression
+The following process is done using SAS.\newline
+#### negative binomial regression
 Firstly, use negative binomial regression to fit model alcohol ~ diet + gender + age + pir . The result is as below.\newline
 ```{sas nb, eval = FALSE}
 /*  model analysis */
 /* (1) negative binomial regression */
 proc genmod data = alcohol_diet;
   model alq = diet gender age pir /dist=negbin;
+run;
+
+/* store the predict value of the model */
+proc sort data = outnb;
+  by id;
 run;
 ```
 
@@ -145,16 +150,33 @@ proc genmod data = alcohol_diet order = data;
   model alq = diet gender age pir /dist=zinb;
   zeromodel meal_out;
 run;
+
+/* store the predict value of the model */
+proc sort data = outzinb;
+  by id;
+run;
+/* merge the predict values of the two model */
+data predict;
+  merge outnb outzinb;
+  by id;
+run;
 ```
 
-```{r zinbreg, echo=FALSE, fig.align='center',out.width = 609, out.height = 760,echo=FALSE}
+```{r zinbreg, echo=FALSE, fig.align='center',out.width = 609, out.height = 810,echo=FALSE}
 knitr::include_graphics("./zinb_results.pdf")
 ```
 
-We can see from the results that in both models, all the variables are significant. By the AIC value, we can see that the zero-inflated negative binomial model is better.
+#### Use vuong test to compare the two models
+```{sas vuong, eval = FALSE}
+%include "/folders/myfolders/vuong.sas";
+%vuong(data = predict, response = alq,
+	   model1 = nb,   p1 = prednb, dist1 = nb, scale1 = 0.6381,
+	   model2 = zinb, p2 = predzinb, dist2 = zinb, scale2 = 0.2236, pzero2 = p0,
+       nparm1 = 4, nparm2 = 5)
+```
 
-## 4.Comparing and Analysis
-In this part, I'll use Vuong test to compare the performance of the two models. And then do some further analysis.\newline
-This part is to be done. \newline
+```{r vuong result, echo=FALSE, fig.align='center',out.width = 607, out.height = 740,echo=FALSE}
+knitr::include_graphics("./vuong_results.pdf")
+```
 
 
