@@ -1,11 +1,12 @@
 ---
 title: 'Group8: Zero-inflated Negative Binomial Regression'
-author: "Amanda Lee Ketner, Yichao Chen, Xirui Wu"
+author: "Amanda Lee Ketner, Yichao Chen, Xinrui Wu"
 date: "12/9/2019"
 output:
   html_document:
     toc: yes
-  pdf_document:
+  pdf_document: 
+    latex_engine: xelatex
     toc: yes
 subtitle: '*Analysis of the relationship between diet habit and alcohol use*'
 ---
@@ -40,7 +41,7 @@ to fit the model. The choice of this regression is further illustrated
 our method section. Our group members used Stata,R and SAS.  
 
 ## Data
-### Data resource
+### Data sets
 We used three datasets in this analysis:
 
 1.Alcohol Use (ALQ_D.xpt) 
@@ -53,7 +54,7 @@ They are downloaded from NHANES (National Health and Nutrition Examination Surve
 
 As we are making analysis on the alcohol use, so we will only focus on adults (age $\geqslant$ 21).
 
-### Selected Variables
+### Variables
 ```{r,echo=FALSE}
 name=c('alq_frink','diet','meal_out','gender','age','pir')
 ori_name = c("ALQ130", "DBQ700", "DBD091", "RIAGENDR", "RIDAGEYR", "INDFMPIR")
@@ -266,7 +267,8 @@ Consistent with the results using the other methods, the Vuong test shows that
 the zero-inflated negative binomial model is preferred (p<0.000).
 
 ### SAS
-#### Data Cleaning
+#### Data cleaning
+The cleaning process is done using R with the package dplyr.
 Read the data the join variables to use in a new dataset.
 ```{r data1,eval=FALSE}
 # read data :
@@ -303,36 +305,76 @@ Write the new dataset to a csv file for later using in SAS.
 write.csv(alq_diet, file = "alq_diet.csv")
 ```
 
-#### Check the data
+#### Basic analysis
+The following processes is done using SAS.
 Read the new dataset into SAS. 
-
 Check the distribution (mean and variance) of the variables.
+```{sas read_data, eval = FALSE}
+/* Read data */
+proc import replace
+	datafile='/folders/myfolders/STATS506_project/alq_diet.csv' 
+	out=alcohol_diet;
+run;
 
-```{r check1, fig.align='center',eval=FALSE}
-knitr::include_graphics("dist_check.pdf")
+proc print data=alcohol_diet;
+run;
+
+/* Basic checking */
+proc means data = alcohol_diet mean var;
+	var alq meal_out diet age gender pir;
+run;
+
 ```
 
-Draw a histgram to see the distribution of the response variable ("alcohol use"). 
+```{r check1, fig.align='center',out.width = 215*3, out.height = 122*3, echo=FALSE}
+knitr::include_graphics("./SAS/dist_check.pdf")
+```
 
-```{r check2,  fig.align='center',eval=FALSE}
-knitr::include_graphics("hist_alq.pdf")
+Draw a histgram to see the distribution of the response variable ("alcohol use").
+```{sas hist, eval = FALSE}
+/* Frequency graph of alcohol */
+ods graphics / width=4in height=3in border=off;
+proc sgplot data=alcohol_diet;
+	histogram alq /binwidth=1;
+run;
+ods graphics off;
+```
+
+```{r check2,  fig.align='center',out.width = 309*2, out.height = 224*2, echo=FALSE}
+knitr::include_graphics("./SAS/hist_alq.pdf")
 ```
 
 The response variable (alcohol use) is a count variable, so generally we can use Poisson regression. However, the mean and variance of the response shown above as "alq" are not the same, which does not fit the assumption of Poisson regression. So we choose to use negative binomial regression instead.
 
 From the histgram we see that many people do not drink thus there are many 0's in the response. We can imagine that people's not drinking is influnced by another process compared to how much people drink. Thus we use zero-inflated negative binomial regression so that the 0's can be independently modeled.
 
-#### 3.Build Model
+#### Build Model
 ##### negative binomial regression
 Firstly, use negative binomial regression to fit model alcohol ~ diet + gender + age + pir . The result is as below.\newline
-```{r nbreg, echo=FALSE, fig.align='center',eval=FALSE}
-knitr::include_graphics("nb_results.pdf")
+```{sas nb, eval = FALSE}
+/*  model analysis */
+/* (1) negative binomial regression */
+proc genmod data = alcohol_diet;
+  model alq = diet gender age pir /dist=negbin;
+run;
+```
+
+```{r nbreg, echo=FALSE, fig.align='center',out.width = 609, out.height = 655,echo=FALSE}
+knitr::include_graphics("./SAS/nb_results.pdf")
 ```
 
 #### zero-inflated negative binomial regression
 Then, use zero-inflated negative binomial regression to fit model alcohol ~ diet + gender + age + pir where alcohol is not 0 and fit model alcohol ~ meal_out where alcohol is 0. The result is as below.\newline
-```{r zinbreg, echo=FALSE, fig.align='center',eval=FALSE}
-#knitr::include_graphics("zinb_results.pdf")
+```{sas zinb, eval = FALSE}
+/* (2) zero-inflated negative binomial regression */
+proc genmod data = alcohol_diet order = data;
+  model alq = diet gender age pir /dist=zinb;
+  zeromodel meal_out;
+run;
+```
+
+```{r zinbreg, echo=FALSE, fig.align='center',out.width = 609, out.height = 760,echo=FALSE}
+knitr::include_graphics("./SAS/zinb_results.pdf")
 ```
 
 We can see from the results that in both models, all the variables are significant. By the AIC value, we can see that the zero-inflated negative binomial model is better.
@@ -345,15 +387,15 @@ This part is to be done. \newline
 
 Overall, we found a statistically significant and positive relationship between the self-reported
 healthfulness of a person's diet and their alcoholic consumption, indicating that people with less healthy
-diets tend to drink more alcohol on average. Specifically, the expeceted change in log(alq_drink) for one-unit increase in diet is 0.079589 holding other variable constant. From the codebook, the larger diet factor indicate poorer diet behavior.
+diets tend to drink more alcohol on average. Specifically, the expeceted change in log(alq_drink) for one-unit increase in diet is 0.08 holding other variables constant. From the codebook, the larger diet factor indicate poorer diet behavior. That is to say, we have evidence to show that people who drink and have healthier diet tend to drink more.
 
-When gender change from 0 to 1, the change in log(alq_drink) is 0.544, indicating that men tend to drink more than women do.
+Hold other variables the same, log(alq_drink) is 0.5 larger when gender = 1(male) than gender = 0(female), indicating that among drinking people, men tend to drink more than women do.
 
-The expected change in log(alq_drink) for one-unit increase in age is -0.016 holding other variable constant. This means older people tend to drink less alcohol.
+The expected change in log(alq_drink) for one-unit increase in age is -0.02 holding other variables constant. This means among drinking people, older people tend to drink less alcohol.
 
-The expected change in log(alq_drink) for one-unit increase in age is -0.097 holding other variable constant, which means that wealtheir families consume use less alcohol on average.
+The expected change in log(alq_drink) for one-unit increase in family poverty income ratio is -0.10 holding other variables constant, which means that means among drinking families, wealtheir families consume less alcohol on average.
 
-The log odds of being an excessive zero will decrease by 0.05516 for every one more meal eating outside. This means when the frequency of eating out of home is larger, the zero are less likely comes from the part of people who never use alcohol. In other words, more meals eating out of home implies more alcohol use.
+The log odds of being an excessive zero will decrease by 0.06 for every one more meal eating outside. This means when the frequency of eating out of home is larger, the zero are less likely comes from the part of people who never use alcohol. In other words, more meals eating out of home implies more alcohol use.
 
 
 ## Discussion
@@ -363,4 +405,6 @@ The log odds of being an excessive zero will decrease by 0.05516 for every one m
 https://ncss-wpengine.netdna-ssl.com/wp-content/themes/ncss/pdf/Procedures/NCSS/Zero-Inflated_Negative_Binomial_Regression.pdf
 
 https://www.stata.com/manuals13/rzinb.pdf
+
+https://stats.idre.ucla.edu/sas/dae/zero-inflated-negative-binomial-regression/
 
