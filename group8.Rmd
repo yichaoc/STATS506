@@ -25,9 +25,19 @@ library(Hmisc)
 ```
 
 ## Introduction
-Does the habit of diet has some relationship with the alcohol use of people? People with what kind of eating habit tend to drink alcohol more? Our group mainly focus on the relatinship between diet habit and alcohol use. Some demographic variables such as gender, family PIR, age are also taken into consideration in our analysis.
+What is the relationship between eating habits and alcohol use?
+Are certain types of eating habits associated with higher alcohol consumption?
 
-Based on our data, we chose to use zero-inflated negative binomial regression to fit the model. The choice of this regression is further illustrated in the part of method. Our group members use Stata,R and SAS.  
+Our group mainly focuses on the relatinship between diet habit (specifically,
+the self-reported healthfulness of a person's overall diet as well as
+the average number of meals eaten outside the home weekly) and alcohol use 
+(operationalized as the average number of alocholic drinks consumed weekly).
+We also use demographic variables (gender, family povery income ratio, and age)
+as additional covariates.
+
+Based on our data, we chose to use zero-inflated negative binomial regression
+to fit the model. The choice of this regression is further illustrated
+our method section. Our group members used Stata,R and SAS.  
 
 ## Data
 ### Data resource
@@ -77,7 +87,7 @@ $$
 
 Why we choose this zero-inflated negative binomial regression model to fit our data?
 
-As observed, alq_drink is a count variable, this implys that the choice of possion regression or negative binomial regression may be more suitable. we then do some basic analysis of our response:alq_drink.It is overdispersed as its variance is not basiclly equal to its mean. In this case, negative binomial regression might be a better choice. Also, there are excessive zeros in alq_drink. As a result, zero-inflation should be taken into consideration as well. We will also make comparisions to figure out whether the consideration of zero-inflation could contribute to a better model. Details could be found in the core analysis below.
+As observed, alq_drink is a count variable, this implys that the choice of possion regression or negative binomial regression may be more suitable. We then do some basic analysis of our response:alq_drink.It is overdispersed as its variance is not basiclly equal to its mean. In this case, negative binomial regression might be a better choice. Also, there are excessive zeros in alq_drink. As a result, zero-inflation should be taken into consideration as well. We will also make comparisions to figure out whether the consideration of zero-inflation could contribute to a better model. Details could be found in the core analysis below.
 
 ## Core Analysis {.tabset .tabset-fade}
 
@@ -143,16 +153,6 @@ pchisq(2 * (logLik(m1) - logLik(m0)), df = 5, lower.tail=FALSE)
 From the output of chi-squared test, we know that our overall model is statistically significant. 
 
 From the result of m1, the variables of diet, gender, age and pir in the part of negative binomial are all significant predictors. The variable of meal_out in the part of the logit model predicting excessive zero is also statistically significant.
-
-The expeceted change in log(alq_drink) for one-unit increase in diet is 0.079589 holding other variable constant. From the codebook, the larger diet factor indicate poorer diet behavior. The model shows that poorer diet may related to more alcohol use.
-
-When gender change from 0 to 1, the change in log(alq_drink) is 0.544, men tends to drink more than women.
-
-The expeceted change in log(alq_drink) for one-unit increase in age is -0.016 holding other variable constant. This means when age increase, people tend to drink alcohol less.
-
-The expeceted change in log(alq_drink) for one-unit increase in age is -0.097 holding other variable constant, which means family with better finacial situation might use alcohol less.
-
-The log odds of being an excessive zero will decrease by 0.05516 for every one more meal eating outside. This means when the frequency of eating out of home is larger, the zero are less likely comes from the part of people who never use alcohol. In other words, more meals eating out of home implies more alcohol use.
 
 #### Negative Binomial Regression
 Has the consideration of zero-inflation improved our regression model? We could fit the data with negative binomial regression and make comparisions with the former model.
@@ -238,14 +238,32 @@ outreg2 using NegBin.xls, stats(coef se tstat pval) noaster replace
 ```
 
 
+```{r, echo=FALSE, comment = NA}
+
+negbin_table = read.csv('Data/NegBin_clean.csv')
+
+negbin_table %>% knitr::kable(caption = 'Non-Zero-Inflated Negative Binomial', digits=3)
+
+```
+
 #### Zero-Inflated Negative binomial model
 
 ```{stata, echo=TRUE, comment = NA, eval = FALSE}
 
-zinb alq_drink diet i.gender age pir, inflate(meal_out)
+zinb alq_drink diet i.gender age pir, inflate(meal_out) forcevuong
 outreg2 using ZeroNegBin.xls, stats(coef se tstat pval) noaster replace
 
 ```
+
+```{r, echo=FALSE, comment = NA}
+
+negbin_table = read.csv('Data/ZeroNegBin_clean.csv')
+
+negbin_table %>% knitr::kable(caption = 'Zero-Inflated Negative Binomial', digits=3)
+
+```
+Consistent with the results using the other methods, the Vuong test shows that 
+the zero-inflated negative binomial model is preferred (p<0.000).
 
 ### SAS
 #### Data Cleaning
@@ -325,8 +343,24 @@ This part is to be done. \newline
 
 ## Results
 
+Overall, we found a statistically significant and positive relationship between the self-reported
+healthfulness of a person's diet and their alcoholic consumption, indicating that people with less healthy
+diets tend to drink more alcohol on average. Specifically, the expeceted change in log(alq_drink) for one-unit increase in diet is 0.079589 holding other variable constant. From the codebook, the larger diet factor indicate poorer diet behavior.
+
+When gender change from 0 to 1, the change in log(alq_drink) is 0.544, indicating that men tend to drink more than women do.
+
+The expected change in log(alq_drink) for one-unit increase in age is -0.016 holding other variable constant. This means older people tend to drink less alcohol.
+
+The expected change in log(alq_drink) for one-unit increase in age is -0.097 holding other variable constant, which means that wealtheir families consume use less alcohol on average.
+
+The log odds of being an excessive zero will decrease by 0.05516 for every one more meal eating outside. This means when the frequency of eating out of home is larger, the zero are less likely comes from the part of people who never use alcohol. In other words, more meals eating out of home implies more alcohol use.
+
+
 ## Discussion
 
 ## References
 
 https://ncss-wpengine.netdna-ssl.com/wp-content/themes/ncss/pdf/Procedures/NCSS/Zero-Inflated_Negative_Binomial_Regression.pdf
+
+https://www.stata.com/manuals13/rzinb.pdf
+
