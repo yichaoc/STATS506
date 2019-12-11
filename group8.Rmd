@@ -29,7 +29,7 @@ library(Hmisc)
 What is the relationship between eating habits and alcohol use?
 Are certain types of eating habits associated with higher alcohol consumption?
 
-Our group mainly focuses on the relatinship between diet habit (specifically,
+Our group mainly focuses on the relationship between diet habit (specifically,
 the self-reported healthfulness of a person's overall diet as well as
 the average number of meals eaten outside the home weekly) and alcohol use 
 (operationalized as the average number of alocholic drinks consumed weekly).
@@ -85,7 +85,7 @@ We use three different methods to clean the data in the same process as follows.
 ### Zero-inflated negative binomial regression
 The zero-inflated negative binomial regression is used for count data that exhibit overdispersion and excess zeros. The data distribution combines the negative binomial distribution and the logit distribution.
 
-Suppose for each observation, there are two possible cases. If case 1 occurs, the count is zero. If case 2 occurs, counts(including zeros) are generated according to the negative binomial model. We focus on our analysis here. Case is that this person never drink because of some reasons such as alcohol allergy. Case 2 is that this person do have the habit of drink alcohol but the counts of drink may differ according to some related factors. Suppose that case 1 occurs with probalility $\pi$ and case 2 occurs with probability $1-\pi$ . Therefore, the probability distribution of zero-inflated negative binomial regression random variable $y_{i}$ could be written:
+Suppose for each observation, there are two possible cases. If case 1 occurs, the count is zero. If case 2 occurs, counts(including zeros) are generated according to the negative binomial model. We focus on our analysis here. Case 1 is that this person never drink because of some reasons such as alcohol allergy. Case 2 is that this person do have the habit of drink alcohol but the counts of drink may differ according to some related factors. Suppose that case 1 occurs with probability $\pi$ and case 2 occurs with probability $1-\pi$ . Therefore, the probability distribution of zero-inflated negative binomial regression random variable $y_{i}$ could be written:
 
 $$
 \operatorname{Pr}\left(y_{i}=j\right)=\left\{\begin{array}{ll}{\pi_{i}+\left(1-\pi_{i}\right) g\left(y_{i}=0\right)} & {\text { if } j=0} \\ {\left(1-\pi_{i}\right) g\left(y_{i}\right)} & {\text { if } j>0}\end{array}\right.
@@ -99,7 +99,7 @@ Why we choose this zero-inflated negative binomial regression model to fit our d
 
 As observed, alq_drink is a count variable, this implies that the choice of possion regression or negative binomial regression may be more suitable. We then do some basic analysis of our response:alq_drink.It is overdispersed as its variance is not basiclly equal to its mean. In this case, negative binomial regression might be a better choice. Also, there are excessive zeros in alq_drink. As a result, zero-inflation should be taken into consideration as well. We will also make comparisions to figure out whether the consideration of zero-inflation could contribute to a better model. Details could be found in the core analysis below.
 
-### Languages we used
+### Languages used
 Amanda Lee Ketner: Stata \newline
 
 Yichao Chen: R (including packages data.table and pscl) \newline
@@ -109,10 +109,9 @@ Xinrui Wu: SAS (for analysis) and R (with package dyplyr, for data cleaning) \ne
 ## Core Analysis {.tabset .tabset-fade}
 ### R
 #### Data cleaning
-The cleaning process is done using the package of data.table. 
+The data cleaning process is completed using the package of data.table. 
+
 ```{r}
-library(foreign)
-library(data.table)
 AL=read.xport('Data/ALQ_D.xpt')
 write.csv(AL,file='Data/ALQ_D.csv')
 DBQ=read.xport('Data/DBQ_D.xpt')
@@ -143,7 +142,7 @@ data=A1[DBQ1,on='SEQN',nomatch=0L][DEMO1,on='SEQN',nomatch=0L]
 #### Basic data analysis
 As discussed above, whether negative binomial regression is more suitable than poisson regression? Should the zero-inflation be considered? To figure this out, the basic analysis should be made on the response: alq_drink.
 
-The mean and variance are calculated:
+The mean and variance are calculated below:
 ```{r}
 #calculate mean and variance
 sprintf("Mean and Variance = %1.2f and %1.2f", 
@@ -156,7 +155,7 @@ The plot of alq_drink are shown as below:
 ggplot(data,aes(alq_drink))+geom_histogram()+stat_bin(bins=25)+xlab('alq_drink_counts')+ylab('frequency')+ggtitle('The frequency of alq_drink counts')+theme(plot.title=element_text(hjust=0.5))
 ```
 
-From the result, alq_drink is overdispersed as its variance is not basiclly equal to its mean. So, the negative binomial regression is more suitable than poisson regression in our data. From the plot, we could see that a large part of observation has 0 alcohol drink. Taking excess zeros of alq_drink into consideration, zero-inflated regression is used.
+From the result, alq_drink is overdispersed as its variance is not basiclly equal to its mean. So, the negative binomial regression is more suitable than poisson regression in our data. From the plot, we could see that a large part of observation has 0 alcohol drink. Taking excess zeros of alq_drink into consideration, zero-inflated regression is used to fit the data.
 
 #### Zero-Inflated Negative Binomial Regression
 The package of pscl is used for zero-inflated negative binomial regression. The variables of diet, gender, age and pir are used in the part of negative binomial model and the variable of meal_out is used in the logit part of the model.
@@ -166,24 +165,36 @@ summary(m1)
 m0=update(m1, . ~ 1)
 pchisq(2 * (logLik(m1) - logLik(m0)), df = 5, lower.tail=FALSE)
 ```
-From the output of chi-squared test, we know that our overall model is statistically significant. 
+
+From the output of chi-squared test, the p-value is quite small and we know that our overall model is statistically significant. 
 
 From the result of m1, the variables of diet, gender, age and pir in the part of negative binomial are all significant predictors. The variable of meal_out in the part of the logit model predicting excessive zero is also statistically significant.
+
+Holding other variable constant, the expeceted change in log(alq_drink) for one-unit increase in diet is 0.079589. From the codebook, the larger diet factor indicate poorer diet behavior. The model shows that poorer diet may related to more alcohol use.
+
+When gender change from 0 to 1, the change in log(alq_drink) is 0.544, men tends to drink more than women.
+
+The expeceted change in log(alq_drink) for one-unit increase in age is -0.016 holding other variable constant. This means when age increase, people tend to drink alcohol less.
+
+The expeceted change in log(alq_drink) for one-unit increase in age is -0.097 holding other variable constant, which means family with better finacial situation might use alcohol less.
+
+The log odds of being an excessive zero will decrease by 0.05516 for every one more meal eating outside. This means when the frequency of eating out of home is larger, the zero of alcohol use are less likely comes from the part of people who never use alcohol. In other words, more meals eating out of home may relate with more alcohol use.
+
 
 #### Negative Binomial Regression
 Has the consideration of zero-inflation improved our regression model? We could fit the data with negative binomial regression and make comparisions with the former model.
 
 The package of MASS is used for building negative bionomial regression model.
+
 ```{r}
 m2=glm.nb(alq_drink~diet+gender+age+pir,data=data)
 summary(m2)
 vuong(m1, m2)
 ```
-The summary of m2 shows that the variables of diet, gender, age and pir are all significant. The Vuong test suggests that zero-inflated negative binomial regression have better performance and its improvement is significant.
 
+The summary of m2 shows that the variables of diet, gender, age and pir are all significant. From the estimate of diet, gender, age and pir, we could know that poorer diet may related to more alcohol use. Men tends to drink more than women and family with better finacial situation might use alcohol less. The analysis process is quite similar to the analysis before in the zero-inflated negative binomial regression.
 
-
-From the plot, we could see directly that male use alcohol more, poor family pir use alcohol more and unheathier diet use alcohol more. This implies that the use of alchhol may have some correlation with gender, family PIR and diet habit.
+The result of Vuong test suggests that zero-inflated negative binomial regression have better performance and its improvement is significant.
 
 ### Stata
 #### Cleaning the data
@@ -425,17 +436,18 @@ ggplot(newdata1, aes(x = diet, y = alqpre, colour = factor(pir))) +
   labs(x = "diet", y = "Predicted alcohol drink counts")
 ```
 
+From the plot, we could see directly that male use alcohol more than women. Family with smaller  poverty income ratio, which means family in poorer financial situation have larger predicted  alcohol drinking counts. And people with unheathier diet tend to have larger drinking counts as well. This corresonds with our illustration in the part of core analysis that the use of alchhol may have some correlation with gender, family PIR and diet habit.
+
 ## Results
 
 Overall, we found a statistically significant and positive relationship between the self-reported
-healthfulness of a person's diet and their alcoholic consumption. In other words, people with less healthy
-diets tend to drink more alcohol on average. \newline
+healthfulness of a person's diet and their alcoholic consumption. In other words, people with less healthy diets tend to drink more alcohol. \newline
 
-Some explanations about the results are as follows: \newline
+The use of three different languages: Stata, R and SAS reflect basically the same results and some detailed explanations of our zero-inflated negative binomial regression are as follows:
 
-1. The expeceted change in log(alq_drink) for one-unit increase in diet is 0.08 holding other variables constant. Since, from the codebook, the larger diet factor indicate poorer diet behavior, we have evidence to say that people who drink and have healthier diet tend to drink more. \newline
+1. The expeceted change in log(alq_drink) for one-unit increase in diet is about 0.08 holding other variables constant. Since, from the codebook, the larger diet factor indicate poorer diet behavior, we have evidence to say that people who drink and have healthier diet tend to drink more. \newline
 
-2. With other variables kept the same, log(alq_drink) is 0.5 larger when gender = 1(male) than gender = 0(female), indicating that among drinking people, men tend to drink more than women do. \newline
+2. With other variables kept the same, log(alq_drink) is approximately 0.5 larger when gender = 1(male) than gender = 0(female), indicating that among drinking people, men tend to drink more than women do. \newline
 
 3. The expected change in log(alq_drink) for one-unit increase in age is -0.02 holding other variables constant. This means among drinking people, older people tend to drink less alcohol. \newline
 
@@ -443,13 +455,15 @@ Some explanations about the results are as follows: \newline
 
 5. The log odds of being an excessive zero will decrease by 0.06 for every one more meal eating outside. This means when the frequency of eating out of home is larger, the zero are less likely comes from the part of people who never use alcohol. In other words, more meals eating out of home implies more alcohol use. \newline
 
-Besides, we find zero-inflated negative binomial regression works better for this data than negative binomial regression does. \newline
+Besides, using Stata, R and SAS, we all find zero-inflated negative binomial regression works better for this data than negative binomial regression does. \newline
 
 ## References
 
 https://ncss-wpengine.netdna-ssl.com/wp-content/themes/ncss/pdf/Procedures/NCSS/Zero-Inflated_Negative_Binomial_Regression.pdf
 
 https://www.stata.com/manuals13/rzinb.pdf
+
+https://stats.idre.ucla.edu/r/dae/zinb/
 
 https://stats.idre.ucla.edu/sas/dae/zero-inflated-negative-binomial-regression/
 
